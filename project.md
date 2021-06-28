@@ -1,6 +1,6 @@
 项目背景->模型架构->数据处理->训练过程->优化调整->结果->总结
 
-# Yolo v5
+# bdd100k-Yolo v5
 
 ### 项目背景
 
@@ -62,16 +62,55 @@ Bdd100k的标签是由Scalabel生成的JSON格式，首先得将bdd100k的标签
 
 ### 项目背景
 
+天池-2021全国数字生态创新大赛-智能算法赛-生态资产智能分析
+
 基于不同地形地貌的高分辨率遥感影像资料，识别提取土地覆盖和利用类型，实现生态资产盘点、土地利用动态监测、水环境监测与评估、耕地数量与监测等应用；
 
 ### 模型架构
 
-考虑到分割的精度要求，采用Unet++网络架构，使用efficient-b6作为backbone；
+考虑到分割的精度要求，采用[Unet++](https://www.zhihu.com/column/p/295427213?utm_medium=social&utm_source=weibo)网络架构，使用[efficient-b6](https://zhuanlan.zhihu.com/p/137191387)作为backbone；
 
-
+loss是[focal loss](https://www.baidu.com/s?ie=utf-8&f=8&rsv_bp=1&tn=baidu&wd=focal-loss&oq=dice-loss&rsv_pq=9491f9510000baa9&rsv_t=2cdaGaYVlktSJmlyD1koJiymN%2F%2FbkuUSOx5%2Fho90VjHlwk2muzpc%2FRHvbpo&rqlang=cn&rsv_dl=tb&rsv_enter=1&rsv_sug3=6&rsv_sug1=3&rsv_sug7=100&rsv_sug2=0&rsv_btype=t&inputT=927&rsv_sug4=1932)+[dice-loss](https://zhuanlan.zhihu.com/p/269592183)+[softCrossEntropy](https://www.jianshu.com/p/47172eb86b39)联合loss，优化器用的是[AdamW](https://zhuanlan.zhihu.com/p/39543160)，[warm up](https://zhuanlan.zhihu.com/p/261312302) [Cosine](https://zhuanlan.zhihu.com/p/93624972) Scheduler动态调整学习率；[学习率调整策略](https://zhuanlan.zhihu.com/p/93624972)
 
 ### 数据
 
+- 先将图片转换为.jpg格式
+- 数据增强：对训练集一定概率（0.5）地进行以下操作的组合与随机选择：水平、竖直翻转，旋转90°，转置;
+- 对训练集进行归一化操作(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),验证集和测试集也同样进行这个归一化操作；
+- 划分数据集，验证集训练集的20%，训练采用的是全数据；
+
 ### 训练
 
+batch_size为64，lr = 3e-4，训练了300个epoch，模型大约在250个epoch左右收敛到最优；使用通用指标平均交并比mIoU，计算每个类别的交并比的平均值，仅对算法效果进行评价，具体计算公式为：
+
+[![R8Shvt.png](https://z3.ax1x.com/2021/06/26/R8Shvt.png)](https://imgtu.com/i/R8Shvt)
+
+mIoU最好得分为0.3829
+
 ### 优化
+
+开始用loss的是softCrossEntropy，因为数据存在类别不平衡问题，改进loss加入focal-loss和dice-loss，mIoU提升了约1个点；过程中还尝试过换模型deeplabv3+，更大的backbone，换SGD优化器，学习率调整策略等等，效果都不如这个好；还有一些trick没有尝试，比如多模型融合，多尺度训练/测试等等
+
+# 瓷砖-Yolo v5
+
+### 项目背景
+
+瓷砖表面的瑕疵检测是瓷砖行业生产和质量管理的重要环节，也是困扰行业多年的技术瓶颈。利用高效可靠的计算机视觉算法，尽可能快与准确的给出瓷砖疵点具体的位置和类别;
+
+### 模型架构
+
+见首个项目
+
+### 数据
+
+切图：原图大小为:h=6000,w=8192；切图的大小为:640x640,剔除纯背景图片， overlap比例:0.2；步长为512；从原图左上角开始切图,切出来图像的左上角记为x,y；y依次为:0,512,1024,....,5120.但接下来却并非是5632,因为5632+640>6000,所以这里要对切图的overlap做一个调整,最后一步的y=6000-640；
+
+进行简单的数据增强：灰度正规化、增强对比度、水平垂直翻转，效果略有提升
+
+### 训练
+
+batch_size为16，优化器为SGD，LambdaLR自定义调整学习率，训练了200个epoch，发现在150个epoch左右达到最优效果，0.2ACC+0.8mAP = 0.5357
+
+### 优化
+
+过程中将原图切为640 x 640的小块在进行训练，最后推理线上得分提高了约2个点；
